@@ -2,6 +2,7 @@ package prometheusremotewrite
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 	if err := req.Unmarshal(buf); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal request body: %s", err)
 	}
-
+	rex := regexp.MustCompile(`(.*?)="(.*?)"`)
 	now := time.Now()
 	//something very similar is done here so i may want to compare https://github.com/grafana/loki/blob/main/clients/pkg/promtail/targets/lokipush/pushtarget.go#L113
 	//The equivelent of a new input plugin can be seen here https://github.com/grafana/loki/blob/9e84648f3e176d82780db98e59a34d0e40560d1d/pkg/loghttp/push/push.go#L54
@@ -34,14 +35,13 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 		for key, value := range p.DefaultTags {
 			tags[key] = value
 		}
-
-		//What format is Labels stored in, Appears to be a string so does the string need to be unpacked somehow?
 		// Labels = `{job="foobar", cluster="foo-central1", namespace="bar", container_name="buzz"}`
-		//This is ugly but i dont see an easy to use function for this in logproto
-		labels := strings.Split(strings.Trim(ts.Labels, "{}"), ",")
+		labels := strings.Split(strings.Trim(ts.Labels, "{}"), ", ")
 		for _, label := range labels {
-			labelSplit := strings.Split(label, "=") //This will break if any label name or value contains "="
-			tags[strings.TrimSpace(labelSplit[0])] = strings.Trim(strings.TrimSpace(labelSplit[1]), `"`)
+			labelSplit := rex.FindAllStringSubmatch(label, -1)
+			for _, kv := range labelSplit {
+				tags[kv[1]] = kv[2]
+			}
 		}
 
 		for _, s := range ts.Entries {

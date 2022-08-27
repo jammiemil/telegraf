@@ -1,8 +1,10 @@
-# Prometheus Remote Write Parser Plugin
+# Loki Parser Plugin
 
-Converts Loki Push Streams directly into Telegraf metrics. It can
+Converts Loki Protobuf Push Requests directly into Telegraf metrics. It can
 be used with [http_listener_v2](/plugins/inputs/http_listener_v2). There are no
-additional configuration options for Loki Push Streams.
+additional configuration options for Loki Protobuf Push Requests.
+
+NB: This parser does NOT support application/json content
 
 ## Configuration
 
