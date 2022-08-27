@@ -1,50 +1,67 @@
 # Prometheus Remote Write Parser Plugin
 
-Converts prometheus remote write samples directly into Telegraf metrics. It can
+Converts Loki Push Streams directly into Telegraf metrics. It can
 be used with [http_listener_v2](/plugins/inputs/http_listener_v2). There are no
-additional configuration options for Prometheus Remote Write Samples.
+additional configuration options for Loki Push Streams.
 
 ## Configuration
 
 ```toml
 [[inputs.http_listener_v2]]
   ## Address and port to host HTTP listener on
-  service_address = ":1234"
+  service_address = ":3100"
 
   ## Paths to listen to.
-  paths = ["/receive"]
+  paths = ["/loki/api/v1/push"]
 
   ## Data format to consume.
-  data_format = "prometheusremotewrite"
+  data_format = "loki"
 ```
 
 ## Example Input
 
 ```json
-prompb.WriteRequest{
-        Timeseries: []*prompb.TimeSeries{
+protobuf:
+
+logproto.PushRequest{
+        Streams: []*logproto.Streams{
             {
-                Labels: []*prompb.Label{
-                    {Name: "__name__", Value: "go_gc_duration_seconds"},
-                    {Name: "instance", Value: "localhost:9090"},
-                    {Name: "job", Value: "prometheus"},
-                    {Name: "quantile", Value: "0.99"},
+                Labels: []*logproto.Labels{
+                    {Name: "source", Value: "applicationLog"},
+                    {Name: "instance", Value: "localhost"},
+                    {Name: "job", Value: "promtail"},
                 },
-                Samples: []prompb.Sample{
-                    {Value: 4.63, Timestamp: time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano()},
+                Entries: []logproto.Entries{
+                    {Timestamp: time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano(), Entry: "This is a log Line"},
+                    {Timestamp: time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano(), Entry: "This is another log Line"}
                 },
             },
         },
     }
+
+Json body:
+
+{
+  "streams": [
+    {
+      "stream": {
+        "source": "applicationLog",
+        "instance": "localhost",
+        "job": "promtail"
+      },
+      "values": [
+          [ time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano(), "This is a log Line" ],
+          [ time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano(), "This is another log Line" ]
+      ]
+    }
+  ]
+}
 
 ```
 
 ## Example Output
 
 ```text
-prometheus_remote_write,instance=localhost:9090,job=prometheus,quantile=0.99 go_gc_duration_seconds=4.63 1614889298859000000
+loki,source=applicationLog,instance=localhost,job=prometheus message="This is a log line" 1614889298859000000
+loki,source=applicationLog,instance=localhost,job=prometheus message="This is another log Line" 1614889298859000000
 ```
-
-## For alignment with the [InfluxDB v1.x Prometheus Remote Write Spec](https://docs.influxdata.com/influxdb/v1.8/supported_protocols/prometheus/#how-prometheus-metrics-are-parsed-in-influxdb)
-
-- Use the [Starlark processor rename prometheus remote write script](https://github.com/influxdata/telegraf/blob/master/plugins/processors/starlark/testdata/rename_prometheus_remote_write.star) to rename the measurement name to the fieldname and rename the fieldname to value.

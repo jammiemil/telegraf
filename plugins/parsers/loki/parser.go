@@ -10,7 +10,6 @@ import (
 	"github.com/influxdata/telegraf/plugins/parsers"
 
 	"github.com/grafana/loki/pkg/logproto"
-	"github.com/prometheus/common/model"
 )
 
 type Parser struct {
@@ -34,7 +33,6 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 			tags[key] = value
 		}
 
-		//for _, l := range ts.Labels {
 		//What format is Labels stored in, Appears to be a string so does the string need to be unpacked somehow?
 		// Labels = `{job="foobar", cluster="foo-central1", namespace="bar", container_name="buzz"}`
 		//This is ugly but i dont see an easy to use function for this in logproto
@@ -43,15 +41,6 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 			labelSplit := strings.Split(label, "=") //This will break if any label name or value contains "="
 			tags[labelSplit[0]] = labelSplit[1]
 		}
-
-		//tags[l.Labels] = l.Value
-		//}
-
-		metricName := tags[model.MetricNameLabel]
-		if metricName == "" {
-			return nil, fmt.Errorf("metric name %q not found in tag-set or empty", model.MetricNameLabel)
-		}
-		delete(tags, model.MetricNameLabel)
 
 		for _, s := range ts.Entries {
 			fields := make(map[string]interface{})
