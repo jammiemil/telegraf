@@ -17,6 +17,7 @@ type Parser struct {
 }
 
 func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
+	//Decide if this is Logproto or raw json, use the application header to identify?
 	var err error
 	var metrics []telegraf.Metric
 	var req logproto.PushRequest
@@ -26,7 +27,8 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 	}
 
 	now := time.Now()
-
+	//something very similar is done here so i may want to compare https://github.com/grafana/loki/blob/main/clients/pkg/promtail/targets/lokipush/pushtarget.go#L113
+	//The equivelent of a new input plugin can be seen here https://github.com/grafana/loki/blob/9e84648f3e176d82780db98e59a34d0e40560d1d/pkg/loghttp/push/push.go#L54
 	for _, ts := range req.Streams {
 		tags := map[string]string{}
 		for key, value := range p.DefaultTags {
@@ -36,10 +38,10 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 		//What format is Labels stored in, Appears to be a string so does the string need to be unpacked somehow?
 		// Labels = `{job="foobar", cluster="foo-central1", namespace="bar", container_name="buzz"}`
 		//This is ugly but i dont see an easy to use function for this in logproto
-		labels := strings.Split(ts.Labels[1:len(ts.Labels)-1], ",")
+		labels := strings.Split(strings.Trim(ts.Labels, "{}"), ",")
 		for _, label := range labels {
 			labelSplit := strings.Split(label, "=") //This will break if any label name or value contains "="
-			tags[labelSplit[0]] = labelSplit[1]
+			tags[strings.TrimSpace(labelSplit[0])] = strings.Trim(strings.TrimSpace(labelSplit[1]), `"`)
 		}
 
 		for _, s := range ts.Entries {
@@ -53,7 +55,7 @@ func (p *Parser) Parse(buf []byte) ([]telegraf.Metric, error) {
 				if s.Timestamp.UnixNano() > 0 {
 					t = s.Timestamp
 				}
-				m := metric.New("Loki", tags, fields, t)
+				m := metric.New("loki", tags, fields, t)
 				metrics = append(metrics, m)
 			}
 		}

@@ -52,7 +52,7 @@ require (
 	github.com/cisco-ie/nx-telemetry-proto v0.0.0-20220628142927-f4160bcb943c
 	github.com/coocood/freecache v1.2.2
 	github.com/coreos/go-semver v0.3.0
-	github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f
+	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/couchbase/go-couchbase v0.1.1
 	github.com/denisenkom/go-mssqldb v0.12.0
 	github.com/dimchansky/utfbom v1.1.1
@@ -91,7 +91,7 @@ require (
 	github.com/harlow/kinesis-consumer v0.3.6-0.20211204214318-c2b9f79d7ab6
 	github.com/hashicorp/consul/api v1.14.0
 	github.com/hashicorp/go-uuid v1.0.3
-	github.com/influxdata/go-syslog/v3 v3.0.0
+	github.com/influxdata/go-syslog/v3 v3.0.1-0.20200510134747-836dce2cf6da
 	github.com/influxdata/influxdb-observability/common v0.2.22
 	github.com/influxdata/influxdb-observability/influx2otel v0.2.21
 	github.com/influxdata/influxdb-observability/otel2influx v0.2.22
@@ -183,7 +183,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.24.3
 	k8s.io/apimachinery v0.24.3
-	k8s.io/client-go v0.24.3
+	k8s.io/client-go v12.0.0+incompatible
 	modernc.org/sqlite v1.17.3
 )
 
@@ -279,6 +279,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.1.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.4.0 // indirect
+	github.com/grafana/loki v1.6.1
 	github.com/grid-x/serial v0.0.0-20211107191517-583c7356b3aa // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
