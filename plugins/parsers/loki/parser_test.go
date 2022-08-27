@@ -4,60 +4,90 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/prompb"
+	"github.com/grafana/loki/pkg/logproto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/testutil"
 )
 
-func TestParse(t *testing.T) {
-	prompbInput := prompb.WriteRequest{
-		Timeseries: []prompb.TimeSeries{
-			{
-				Labels: []prompb.Label{
-					{Name: "__name__", Value: "go_gc_duration_seconds"},
-					{Name: "quantile", Value: "0.99"},
-				},
-				Samples: []prompb.Sample{
-					{Value: 4.63, Timestamp: time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano()},
-				},
-			},
-			{
-				Labels: []prompb.Label{
-					{Name: "__name__", Value: "prometheus_target_interval_length_seconds"},
-					{Name: "job", Value: "prometheus"},
-				},
-				Samples: []prompb.Sample{
-					{Value: 14.99, Timestamp: time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano()},
-				},
-			},
+var (
+	line        = `level=info ts=2019-12-12T15:00:08.325Z caller=compact.go:441 component=tsdb msg="compact blocks" count=3 mint=1576130400000 maxt=1576152000000 ulid=01DVX9ZHNM71GRCJS7M34Q0EV7 sources="[01DVWNC6NWY1A60AZV3Z6DGS65 01DVWW7XXX75GHA6ZDTD170CSZ 01DVX33N5W86CWJJVRPAVXJRWJ]" duration=2.897213221s`
+	streamInput = logproto.Stream{
+		Labels: `{job="foobar", cluster="foo-central1", namespace="bar", container_name="buzz"}`,
+		Hash:   1234*10 ^ 9,
+		Entries: []logproto.Entry{
+			{time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano(), line},
+			{time.Date(2020, 4, 1, 0, 0, 1, 0, time.UTC).UnixNano(), line},
+			{time.Date(2020, 4, 1, 0, 0, 2, 0, time.UTC).UnixNano(), line},
+			{time.Date(2020, 4, 1, 0, 0, 3, 0, time.UTC).UnixNano(), line},
 		},
 	}
+	StreamAdapterInput = logproto.StreamAdapter{
+		Labels: `{job="foobar", cluster="foo-central1", namespace="bar", container_name="buzz"}`,
+		Hash:   1234*10 ^ 9,
+		Entries: []logproto.EntryAdapter{
+			{time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano(), line},
+			{time.Date(2020, 4, 1, 0, 0, 1, 0, time.UTC).UnixNano(), line},
+			{time.Date(2020, 4, 1, 0, 0, 2, 0, time.UTC).UnixNano(), line},
+			{time.Date(2020, 4, 1, 0, 0, 3, 0, time.UTC).UnixNano(), line},
+		},
+	}
+)
 
-	inoutBytes, err := prompbInput.Marshal()
+func TestParseStreamAdapter(t *testing.T) {
+	//Logproto
+	inoutBytes, err := StreamAdapterInput.Marshal()
 	require.NoError(t, err)
 
 	expected := []telegraf.Metric{
 		testutil.MustMetric(
-			"prometheus_remote_write",
+			"loki",
 			map[string]string{
-				"quantile": "0.99",
+				"job":       "foobar",
+				"cluster":   "foo-central1",
+				"namespace": "bar", "container_name": "buzz",
 			},
 			map[string]interface{}{
-				"go_gc_duration_seconds": float64(4.63),
+				"message": line,
 			},
-			time.Unix(0, 0),
+			time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC),
 		),
 		testutil.MustMetric(
-			"prometheus_remote_write",
+			"loki",
 			map[string]string{
-				"job": "prometheus",
+				"job":       "foobar",
+				"cluster":   "foo-central1",
+				"namespace": "bar", "container_name": "buzz",
 			},
 			map[string]interface{}{
-				"prometheus_target_interval_length_seconds": float64(14.99),
+				"message": line,
 			},
-			time.Unix(0, 0),
+			time.Date(2020, 4, 1, 0, 0, 1, 0, time.UTC),
+		),
+		testutil.MustMetric(
+			"loki",
+			map[string]string{
+				"job":       "foobar",
+				"cluster":   "foo-central1",
+				"namespace": "bar", "container_name": "buzz",
+			},
+			map[string]interface{}{
+				"message": line,
+			},
+			time.Date(2020, 4, 1, 0, 0, 2, 0, time.UTC),
+		),
+		testutil.MustMetric(
+			"loki",
+			map[string]string{
+				"job":       "foobar",
+				"cluster":   "foo-central1",
+				"namespace": "bar", "container_name": "buzz",
+			},
+			map[string]interface{}{
+				"message": line,
+			},
+			time.Date(2020, 4, 1, 0, 0, 3, 0, time.UTC),
 		),
 	}
 
@@ -67,39 +97,102 @@ func TestParse(t *testing.T) {
 
 	metrics, err := parser.Parse(inoutBytes)
 	require.NoError(t, err)
-	require.Len(t, metrics, 2)
+	require.Len(t, metrics, 4)
+	testutil.RequireMetricsEqual(t, expected, metrics, testutil.IgnoreTime(), testutil.SortMetrics())
+}
+
+func TestParseStream(t *testing.T) {
+	//Logproto
+	inoutBytes, err := streamInput.Marshal()
+	require.NoError(t, err)
+
+	expected := []telegraf.Metric{
+		testutil.MustMetric(
+			"loki",
+			map[string]string{
+				"job":       "foobar",
+				"cluster":   "foo-central1",
+				"namespace": "bar", "container_name": "buzz",
+			},
+			map[string]interface{}{
+				"message": line,
+			},
+			time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC),
+		),
+		testutil.MustMetric(
+			"loki",
+			map[string]string{
+				"job":       "foobar",
+				"cluster":   "foo-central1",
+				"namespace": "bar", "container_name": "buzz",
+			},
+			map[string]interface{}{
+				"message": line,
+			},
+			time.Date(2020, 4, 1, 0, 0, 1, 0, time.UTC),
+		),
+		testutil.MustMetric(
+			"loki",
+			map[string]string{
+				"job":       "foobar",
+				"cluster":   "foo-central1",
+				"namespace": "bar", "container_name": "buzz",
+			},
+			map[string]interface{}{
+				"message": line,
+			},
+			time.Date(2020, 4, 1, 0, 0, 2, 0, time.UTC),
+		),
+		testutil.MustMetric(
+			"loki",
+			map[string]string{
+				"job":       "foobar",
+				"cluster":   "foo-central1",
+				"namespace": "bar", "container_name": "buzz",
+			},
+			map[string]interface{}{
+				"message": line,
+			},
+			time.Date(2020, 4, 1, 0, 0, 3, 0, time.UTC),
+		),
+	}
+
+	parser := Parser{
+		DefaultTags: map[string]string{},
+	}
+
+	metrics, err := parser.Parse(inoutBytes)
+	require.NoError(t, err)
+	require.Len(t, metrics, 4)
 	testutil.RequireMetricsEqual(t, expected, metrics, testutil.IgnoreTime(), testutil.SortMetrics())
 }
 
 func TestDefaultTags(t *testing.T) {
-	prompbInput := prompb.WriteRequest{
-		Timeseries: []prompb.TimeSeries{
-			{
-				Labels: []prompb.Label{
-					{Name: "__name__", Value: "foo"},
-					{Name: "__eg__", Value: "bar"},
-				},
-				Samples: []prompb.Sample{
-					{Value: 1, Timestamp: time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano()},
-				},
-			},
+	logprotoInput := logproto.StreamAdapter{
+		Labels: `{job="foobar", cluster="foo-central1", namespace="bar", container_name="buzz"}`,
+		Hash:   1234*10 ^ 9,
+		Entries: []logproto.EntryAdapter{
+			{time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC).UnixNano(), line},
 		},
 	}
 
-	inoutBytes, err := prompbInput.Marshal()
+	inoutBytes, err := logprotoInput.Marshal()
 	require.NoError(t, err)
 
 	expected := []telegraf.Metric{
 		testutil.MustMetric(
 			"prometheus_remote_write",
 			map[string]string{
-				"defaultTag": "defaultTagValue",
-				"__eg__":     "bar",
+				"defaultTag":     "defaultTagValue",
+				"job":            "foobar",
+				"cluster":        "foo-central1",
+				"namespace":      "bar",
+				"container_name": "buzz",
 			},
 			map[string]interface{}{
-				"foo": float64(1),
+				"message": line,
 			},
-			time.Unix(0, 0),
+			time.Date(2020, 4, 1, 0, 0, 0, 0, time.UTC),
 		),
 	}
 
@@ -113,46 +206,4 @@ func TestDefaultTags(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	testutil.RequireMetricsEqual(t, expected, metrics, testutil.IgnoreTime(), testutil.SortMetrics())
-}
-
-func TestMetricsWithTimestamp(t *testing.T) {
-	testTime := time.Date(2020, time.October, 4, 17, 0, 0, 0, time.UTC)
-	testTimeUnix := testTime.UnixNano() / int64(time.Millisecond)
-	prompbInput := prompb.WriteRequest{
-		Timeseries: []prompb.TimeSeries{
-			{
-				Labels: []prompb.Label{
-					{Name: "__name__", Value: "foo"},
-					{Name: "__eg__", Value: "bar"},
-				},
-				Samples: []prompb.Sample{
-					{Value: 1, Timestamp: testTimeUnix},
-				},
-			},
-		},
-	}
-
-	inoutBytes, err := prompbInput.Marshal()
-	require.NoError(t, err)
-
-	expected := []telegraf.Metric{
-		testutil.MustMetric(
-			"prometheus_remote_write",
-			map[string]string{
-				"__eg__": "bar",
-			},
-			map[string]interface{}{
-				"foo": float64(1),
-			},
-			testTime,
-		),
-	}
-	parser := Parser{
-		DefaultTags: map[string]string{},
-	}
-
-	metrics, err := parser.Parse(inoutBytes)
-	require.NoError(t, err)
-	require.Len(t, metrics, 1)
-	testutil.RequireMetricsEqual(t, expected, metrics, testutil.SortMetrics())
 }
